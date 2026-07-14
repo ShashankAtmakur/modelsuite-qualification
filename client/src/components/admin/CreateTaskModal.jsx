@@ -1,33 +1,57 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { createTask, fetchTalents } from '../../api/tasks';
+import { useToast } from '../../context/ToastContext';
 
 const STATUS_OPTIONS = ['Open', 'Claimed', 'Submitted', 'Approved', 'Rejected'];
 
 const inputCls  = 'w-full bg-bg-input border border-border rounded-lg px-3.5 py-2.5 text-sm text-text-primary outline-none placeholder:text-[#4e4a6e] focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-all font-sans resize-y';
 const labelCls  = 'text-[11px] font-semibold uppercase tracking-[0.5px] text-text-muted';
 
+const isValidFutureOrToday = (dateStr) => {
+  if (!dateStr) return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const selected = new Date(`${dateStr}T00:00:00`);
+  return !Number.isNaN(selected.getTime()) && selected >= today;
+};
+
 const CreateTaskModal = ({ onClose, onCreated }) => {
   const [form, setForm] = useState({ title: '', description: '', status: 'Open', assignedTo: '', dueDate: '' });
   const [talents, setTalents] = useState([]);
-  const [loadingTalents, setLoadingTalents] = useState(false);
-  useState(() => {
-    setLoadingTalents(true);
+  const [loadingTalents, setLoadingTalents] = useState(true);
+  const [dateError, setDateError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+
+  useEffect(() => {
     fetchTalents()
       .then(({ data }) => setTalents(data))
-      .catch(() => alert('Failed to load talents'))
+      .catch(() => toast.error('Failed to load talents'))
       .finally(() => setLoadingTalents(false));
-  }, []);
+  }, [toast]);
 
-  const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((p) => ({ ...p, [name]: value }));
+    if (name === 'dueDate') setDateError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!isValidFutureOrToday(form.dueDate)) {
+      setDateError('Due date cannot be in the past');
+      return;
+    }
+    setSaving(true);
     try {
       const { data } = await createTask({ ...form, assignedTo: form.assignedTo || undefined });
+      toast.success('Task created');
       onCreated(data);
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to create task');
+      toast.error(err.response?.data?.message || 'Failed to create task');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -69,8 +93,9 @@ const CreateTaskModal = ({ onClose, onCreated }) => {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={labelCls}>Due Date</label>
-              
-              <input type="date" name="dueDate" value={form.dueDate} onChange={handleChange} className={inputCls} />
+              <input type="date" name="dueDate" value={form.dueDate} onChange={handleChange}
+                className={`${inputCls} ${dateError ? 'border-danger focus:border-danger focus:ring-danger/15' : ''}`} />
+              {dateError && <span className="text-[12px] text-danger">{dateError}</span>}
             </div>
           </div>
 
@@ -90,9 +115,9 @@ const CreateTaskModal = ({ onClose, onCreated }) => {
               className="px-5 py-2.5 bg-bg-input text-text-muted border border-border rounded-lg text-sm font-medium cursor-pointer hover:bg-bg-hover hover:text-text-primary transition-all font-sans">
               Cancel
             </button>
-            <button type="submit"
-              className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white cursor-pointer btn-gradient border-none font-sans">
-              Create Task
+            <button type="submit" disabled={saving}
+              className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white cursor-pointer btn-gradient border-none font-sans disabled:opacity-60 disabled:cursor-not-allowed">
+              {saving ? 'Creating…' : 'Create Task'}
             </button>
           </div>
         </form>

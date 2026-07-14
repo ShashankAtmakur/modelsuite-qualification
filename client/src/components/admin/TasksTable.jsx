@@ -1,4 +1,15 @@
+import { useState } from 'react';
 import { deleteTask } from '../../api/tasks';
+import { useToast } from '../../context/ToastContext';
+
+/* ── Sort icons ── */
+const IconSort = ({ direction }) => (
+  <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="opacity-70">
+    {direction === 'asc' && <path d="M6 14l4 4 4-4" />}
+    {direction === 'desc' && <path d="M6 6l4-4 4 4" />}
+    {!direction && <path d="M10 4v12M6 8l4-4 4 4" />}
+  </svg>
+);
 
 /* ── SVG Action Icons ── */
 const IconEdit = () => (
@@ -41,14 +52,60 @@ const STATUS_CLASS = {
   Rejected:  'status-badge-Rejected',
 };
 
+const SORTABLE_COLUMNS = [
+  { key: 'title', label: 'Title' },
+  { key: 'status', label: 'Status' },
+  { key: 'assignedTo', label: 'Assigned To' },
+  { key: 'dueDate', label: 'Due Date' },
+  { key: 'createdAt', label: 'Created' },
+];
+
+const compareValues = (a, b, key) => {
+  let va = a[key];
+  let vb = b[key];
+
+  if (key === 'assignedTo') {
+    va = a.assignedTo?.name?.toLowerCase() || '';
+    vb = b.assignedTo?.name?.toLowerCase() || '';
+  } else if (key === 'dueDate' || key === 'createdAt') {
+    va = va ? new Date(va).getTime() : Number.NaN;
+    vb = vb ? new Date(vb).getTime() : Number.NaN;
+    if (Number.isNaN(va)) return 1;
+    if (Number.isNaN(vb)) return -1;
+  } else {
+    va = String(va || '').toLowerCase();
+    vb = String(vb || '').toLowerCase();
+  }
+
+  if (va < vb) return -1;
+  if (va > vb) return 1;
+  return 0;
+};
+
 const TasksTable = ({ tasks, onEdit, onRefresh }) => {
+  const toast = useToast();
+  const [sort, setSort] = useState({ key: null, direction: 'asc' });
+
+  const handleSort = (key) => {
+    setSort((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (!sort.key) return 0;
+    const cmp = compareValues(a, b, sort.key);
+    return sort.direction === 'asc' ? cmp : -cmp;
+  });
 
   const handleDelete = async (id) => {
     try {
       await deleteTask(id);
+      toast.success('Task deleted');
       onRefresh();
     } catch {
-      alert('Failed to delete task');
+      toast.error('Failed to delete task');
     }
   };
 
@@ -70,16 +127,19 @@ const TasksTable = ({ tasks, onEdit, onRefresh }) => {
       <table className="w-full border-collapse" style={{ fontSize: '13.5px' }}>
         <thead>
           <tr>
-            <th className="table-th">Title</th>
-            <th className="table-th">Status</th>
-            <th className="table-th">Assigned To</th>
-            <th className="table-th">Due Date</th>
-            <th className="table-th">Created</th>
+            {SORTABLE_COLUMNS.map(({ key, label }) => (
+              <th key={key} className="table-th cursor-pointer select-none" onClick={() => handleSort(key)}>
+                <span className="inline-flex items-center gap-1.5">
+                  {label}
+                  <IconSort direction={sort.key === key ? sort.direction : null} />
+                </span>
+              </th>
+            ))}
             <th className="table-th">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {tasks.map((task, i) => (
+          {sortedTasks.map((task, i) => (
             <tr key={task._id}
               className="table-row table-row-animate"
               style={{ animationDelay: `${i * 0.05}s` }}>

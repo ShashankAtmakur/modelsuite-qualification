@@ -1,4 +1,5 @@
 ﻿import { claimTask } from '../../api/talent';
+import { useToast } from '../../context/ToastContext';
 
 const STATUS_CLASS = {
   Open:      'status-badge-Open',
@@ -9,13 +10,15 @@ const STATUS_CLASS = {
 };
 
 const TaskCard = ({ task, showClaimButton = false, onClaimed }) => {
+  const toast = useToast();
 
   const handleClaim = async () => {
     try {
       await claimTask(task._id);
+      toast.success('Task claimed');
       if (onClaimed) onClaimed();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to claim task');
+      toast.error(err.response?.data?.message || 'Failed to claim task');
     }
   };
 

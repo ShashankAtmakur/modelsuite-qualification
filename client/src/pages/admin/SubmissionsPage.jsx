@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Sidebar from '../../components/admin/Sidebar';
 import SubmissionReviewModal from '../../components/admin/SubmissionReviewModal';
 import { fetchAllSubmissions } from '../../api/submissions';
+import { useToast } from '../../context/ToastContext';
 
 const REVIEW_STATUS_CLASS = {
   Pending:  'status-badge-Submitted',
@@ -9,21 +10,77 @@ const REVIEW_STATUS_CLASS = {
   Rejected: 'status-badge-Rejected',
 };
 
+const SORTABLE_COLUMNS = [
+  { key: 'task', label: 'Task' },
+  { key: 'talent', label: 'Talent' },
+  { key: 'submittedAt', label: 'Submitted' },
+  { key: 'reviewStatus', label: 'Review Status' },
+];
+
+const IconSort = ({ direction }) => (
+  <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="opacity-70">
+    {direction === 'asc' && <path d="M6 14l4 4 4-4" />}
+    {direction === 'desc' && <path d="M6 6l4-4 4 4" />}
+    {!direction && <path d="M10 4v12M6 8l4-4 4 4" />}
+  </svg>
+);
+
+const compareSubmissions = (a, b, key) => {
+  let va;
+  let vb;
+
+  if (key === 'task') {
+    va = String(a.taskId?.title || '').toLowerCase();
+    vb = String(b.taskId?.title || '').toLowerCase();
+  } else if (key === 'talent') {
+    va = String(a.talentId?.name || '').toLowerCase();
+    vb = String(b.talentId?.name || '').toLowerCase();
+  } else if (key === 'submittedAt') {
+    va = a.createdAt ? new Date(a.createdAt).getTime() : Number.NaN;
+    vb = b.createdAt ? new Date(b.createdAt).getTime() : Number.NaN;
+    if (Number.isNaN(va)) return 1;
+    if (Number.isNaN(vb)) return -1;
+  } else {
+    va = String(a[key] || '').toLowerCase();
+    vb = String(b[key] || '').toLowerCase();
+  }
+
+  if (va < vb) return -1;
+  if (va > vb) return 1;
+  return 0;
+};
+
 const SubmissionsPage = () => {
   const [submissions, setSubmissions] = useState([]);
   const [reviewTarget, setReviewTarget] = useState(null);
+  const [sort, setSort] = useState({ key: null, direction: 'asc' });
+  const toast = useToast();
 
   const loadSubmissions = async () => {
     try {
       const { data } = await fetchAllSubmissions();
       setSubmissions(data);
     } catch {
-      alert('Failed to load submissions');
+      toast.error('Failed to load submissions');
     }
   };
 
   // eslint-disable-next-line
   useEffect(() => { loadSubmissions(); }, []);
+
+  const handleSort = (key) => {
+    setSort((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const sortedSubmissions = [...submissions].sort((a, b) => {
+    if (!sort.key) return 0;
+    const cmp = compareSubmissions(a, b, sort.key);
+    return sort.direction === 'asc' ? cmp : -cmp;
+  });
+
   const pending  = submissions.filter((s) => s.reviewStatus === 'Pending').length;
   const approved = submissions.filter((s) => s.reviewStatus === 'Approved').length;
   const rejected = submissions.filter((s) => s.reviewStatus === 'Rejected').length;
@@ -77,18 +134,21 @@ const SubmissionsPage = () => {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="bg-bg-surface">
-                    <th className={thCls}>Task</th>
-                    <th className={thCls}>Talent</th>
+                    {SORTABLE_COLUMNS.map(({ key, label }) => (
+                      <th key={key} className={`${thCls} cursor-pointer select-none`} onClick={() => handleSort(key)}>
+                        <span className="inline-flex items-center gap-1.5">
+                          {label}
+                          <IconSort direction={sort.key === key ? sort.direction : null} />
+                        </span>
+                      </th>
+                    ))}
                     <th className={thCls}>Notes</th>
                     <th className={thCls}>File</th>
-                    
-                    <th className={thCls}>Submitted</th>
-                    <th className={thCls}>Review Status</th>
                     <th className={thCls}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {submissions.map((sub) => (
+                  {sortedSubmissions.map((sub) => (
                     <tr key={sub._id} className="border-b border-border last:border-0 hover:bg-bg-hover transition-colors">
 
                       {/* Task */}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import API from '../api/axios';
 
 const Logo = () => (
@@ -17,15 +18,17 @@ const RegisterPage = () => {
   const [role, setRole]       = useState('Talent');
   const { login }  = useAuth();
   const navigate   = useNavigate();
+  const toast      = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const { data } = await API.post('/auth/register', { name, email, password, role });
       login(data);
+      toast.success('Account created');
       data.role === 'Admin' ? navigate('/admin/dashboard') : navigate('/talent/dashboard');
     } catch (err) {
-      alert(err.response?.data?.message || 'Registration failed');
+      toast.error(err.response?.data?.message || 'Registration failed');
     }
   };
 

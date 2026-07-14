@@ -4,6 +4,7 @@ import TasksTable from '../../components/admin/TasksTable';
 import CreateTaskModal from '../../components/admin/CreateTaskModal';
 import EditTaskModal from '../../components/admin/EditTaskModal';
 import { fetchAllTasks } from '../../api/tasks';
+import { useToast } from '../../context/ToastContext';
 
 /* ── Search icon ── */
 const IconSearch = () => (
@@ -26,13 +27,14 @@ const AdminDashboard = () => {
   const [editTask, setEditTask]     = useState(null);
   const [search, setSearch]         = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const toast = useToast();
 
   const loadTasks = async () => {
     try {
       const { data } = await fetchAllTasks();
       setTasks(data);
     } catch {
-      alert('Failed to load tasks');
+      toast.error('Failed to load tasks');
     }
   };
 

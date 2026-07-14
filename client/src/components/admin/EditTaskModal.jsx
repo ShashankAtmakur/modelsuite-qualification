@@ -1,9 +1,18 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { updateTask, fetchTalents } from '../../api/tasks';
+import { useToast } from '../../context/ToastContext';
 
 const STATUS_OPTIONS = ['Open', 'Claimed', 'Submitted', 'Approved', 'Rejected'];
 const inputCls = 'w-full bg-bg-input border border-border rounded-lg px-3.5 py-2.5 text-sm text-text-primary outline-none placeholder:text-[#4e4a6e] focus:border-primary focus:ring-[3px] focus:ring-primary/15 transition-all font-sans resize-y';
 const labelCls = 'text-[11px] font-semibold uppercase tracking-[0.5px] text-text-muted';
+
+const isValidFutureOrToday = (dateStr) => {
+  if (!dateStr) return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const selected = new Date(`${dateStr}T00:00:00`);
+  return !Number.isNaN(selected.getTime()) && selected >= today;
+};
 
 const EditTaskModal = ({ task, onClose, onUpdated }) => {
   const [form, setForm] = useState({
@@ -14,21 +23,36 @@ const EditTaskModal = ({ task, onClose, onUpdated }) => {
     dueDate:     task.dueDate     || '',
   });
   const [talents, setTalents] = useState([]);
+  const [dateError, setDateError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
 
-  useState(() => {
-    fetchTalents().then(({ data }) => setTalents(data)).catch(() => {});
-  }, []);
+  useEffect(() => {
+    fetchTalents().then(({ data }) => setTalents(data)).catch(() => toast.error('Failed to load talents'));
+  }, [toast]);
 
-  const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((p) => ({ ...p, [name]: value }));
+    if (name === 'dueDate') setDateError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!isValidFutureOrToday(form.dueDate)) {
+      setDateError('Due date cannot be in the past');
+      return;
+    }
+    setSaving(true);
     try {
       const { data } = await updateTask(task._id, { ...form, assignedTo: form.assignedTo || null });
+      toast.success('Task updated');
       onUpdated(data);
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update task');
+      toast.error(err.response?.data?.message || 'Failed to update task');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -65,7 +89,9 @@ const EditTaskModal = ({ task, onClose, onUpdated }) => {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={labelCls}>Due Date</label>
-              <input type="date" name="dueDate" value={form.dueDate} onChange={handleChange} className={inputCls} />
+              <input type="date" name="dueDate" value={form.dueDate} onChange={handleChange}
+                className={`${inputCls} ${dateError ? 'border-danger focus:border-danger focus:ring-danger/15' : ''}`} />
+              {dateError && <span className="text-[12px] text-danger">{dateError}</span>}
             </div>
           </div>
 
@@ -83,9 +109,9 @@ const EditTaskModal = ({ task, onClose, onUpdated }) => {
               className="px-5 py-2.5 bg-bg-input text-text-muted border border-border rounded-lg text-sm font-medium cursor-pointer hover:bg-bg-hover hover:text-text-primary transition-all font-sans">
               Cancel
             </button>
-            <button type="submit"
-              className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white cursor-pointer btn-gradient border-none font-sans">
-              Save Changes
+            <button type="submit" disabled={saving}
+              className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white cursor-pointer btn-gradient border-none font-sans disabled:opacity-60 disabled:cursor-not-allowed">
+              {saving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
         </form>
