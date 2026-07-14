@@ -104,6 +104,7 @@ const Sidebar = () => {
             title="Sign out"
             className="logout-btn">
             <IconLogout />
+            <span>Sign out</span>
           </button>
         </div>
       </div>

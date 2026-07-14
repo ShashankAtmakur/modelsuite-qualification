@@ -75,7 +75,7 @@ const TalentSidebar = () => {
               {user?.name?.[0]?.toUpperCase() ?? 'T'}
             </div>
             <div className="min-w-0">
-              <p className="text-[13px] font-semibold truncate max-w-[100px]"
+              <p className="text-[13px] font-semibold truncate max-w-[80px]"
                 style={{ color: '#E5E2E1', fontFamily: 'Inter, sans-serif' }}>
                 {user?.name}
               </p>
@@ -88,6 +88,7 @@ const TalentSidebar = () => {
             title="Sign out"
             className="logout-btn">
             <IconLogout />
+            <span>Sign out</span>
           </button>
         </div>
       </div>
